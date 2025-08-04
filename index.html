@@ -1,0 +1,503 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NextGen 2025</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+    body {
+      background-color: #F3F4F6;
+      font-family: 'Inter', sans-serif;
+    }
+    .orange-bg {
+      background-color: #F97316;
+    }
+    .orange-text {
+      color: #F97316;
+    }
+    .gray-bg {
+      background-color: #F9FAFB;
+    }
+    .gray-text {
+      color: #4B5563;
+    }
+    .border-orange {
+      border-color: #F97316;
+    }
+    .progress-container {
+      width: 100%;
+      height: 6px;
+      background: #D1D5DB;
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #F97316;
+      transition: width 0.3s ease;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: transparent;
+      position: absolute;
+      top: 0;
+      left: 0;
+      cursor: pointer;
+      z-index: 10;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #F97316;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #F97316;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    textarea, input[type="text"] {
+      transition: all 0.2s ease;
+    }
+    textarea:focus, input[type="text"]:focus {
+      border-color: #F97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+    }
+    button {
+      transition: all 0.2s ease;
+    }
+  </style>
+</head>
+<body>
+<div class="container mx-auto p-6 max-w-5xl">
+<h1 class="text-3xl font-semibold mb-6 orange-text">NextGen 2025</h1>
+<div class="min-h-[600px]" id="profiles-container"></div>
+<div class="flex justify-between mt-6">
+<button class="orange-bg text-white px-4 py-2 rounded-lg disabled:bg-gray-300 hover:bg-orange-600 text-sm font-medium" disabled="" id="prev-btn" onclick="previousPage()">Anterior</button>
+<button class="orange-bg text-white px-4 py-2 rounded-lg hover:bg-orange-600 text-sm font-medium" onclick="exportToPDF()">Exportar para PDF</button>
+<button class="orange-bg text-white px-4 py-2 rounded-lg hover:bg-orange-600 text-sm font-medium" id="next-btn" onclick="nextPage()">Próximo</button>
+</div>
+</div>
+<script>
+function uploadPhoto(event, profileIndex) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const imageDataUrl = e.target.result;
+    savedData[profileIndex] = savedData[profileIndex] || {};
+    savedData[profileIndex].photo = imageDataUrl;
+    localStorage.setItem('nextgen2025_data', JSON.stringify(savedData));
+    renderProfiles();
+  };
+  reader.readAsDataURL(file);
+}
+
+
+
+    const profiles = [
+      { name: 'Ana Silva' },
+      { name: 'Carlos Mendes' },
+      { name: 'Mariana Costa' },
+      ...Array.from({ length: 18 }, (_, i) => ({ name: `Participante ${27 - i}` }))
+    ];
+    let currentPage = 0;
+    let savedData = {};
+
+    // Load saved data from localStorage on page load
+    window.onload = () => {
+      const storedData = localStorage.getItem('nextgen2025_data');
+      if (storedData) {
+        savedData = JSON.parse(storedData);
+      }
+      renderProfiles();
+    };
+
+    // Prevent arrow key navigation
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+      }
+    });
+
+    function saveField(profileIndex, field, value) {
+      if (!savedData[profileIndex]) savedData[profileIndex] = {};
+      savedData[profileIndex][field] = value;
+      localStorage.setItem('nextgen2025_data', JSON.stringify(savedData)); // Save to localStorage
+      renderProfiles(); // Re-render to update the UI with saved data
+      console.log(`Saved ${field} for ${profiles[profileIndex].name}:`, value);
+    }
+
+    function addCompetencia(profileIndex) {
+      const input = document.getElementById(`competencia-${profileIndex}`);
+      const competencia = input.value.trim();
+      if (competencia) {
+        const list = document.getElementById(`competencias-list-${profileIndex}`);
+        const li = document.createElement('li');
+        li.className = 'gray-text text-sm flex justify-between items-center';
+        li.innerHTML = `
+          <span>${competencia}</span>
+          <button onclick="removeCompetencia(${profileIndex}, '${competencia}')" class="text-red-500 hover:text-red-700 text-xs ml-2">x</button>
+        `;
+        list.appendChild(li);
+        input.value = '';
+        const currentCompetencias = savedData[profileIndex]?.competencias || [];
+        saveField(profileIndex, 'competencias', [...currentCompetencias, competencia]);
+      }
+    }
+
+    function removeCompetencia(profileIndex, competenciaToRemove) {
+      const currentCompetencias = savedData[profileIndex]?.competencias || [];
+      const updatedCompetencias = currentCompetencias.filter(comp => comp !== competenciaToRemove);
+      saveField(profileIndex, 'competencias', updatedCompetencias);
+      renderProfiles(); // Re-render to update the list
+    }
+
+    function updateRadarChart(profileIndex) {
+      const ctx = document.getElementById(`radar-chart-${profileIndex}`).getContext('2d');
+      const radarData = savedData[profileIndex]?.radarData || {
+        labels: ['Competência 1', 'Competência 2', 'Competência 3', 'Competência 4', 'Competência 5'],
+        values: [5, 5, 5, 5, 5]
+      };
+      if (window[`radarChart${profileIndex}`]) {
+        window[`radarChart${profileIndex}`].destroy();
+      }
+      window[`radarChart${profileIndex}`] = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: radarData.labels,
+          datasets: [{
+            label: 'Perfil Comportamental',
+            data: radarData.values,
+            backgroundColor: 'rgba(249, 115, 22, 0.2)',
+            borderColor: '#F97316',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          scales: {
+            r: {
+              angleLines: { color: '#D1D5DB' },
+              grid: { color: '#D1D5DB' },
+              pointLabels: { color: '#4B5563', font: { size: 12 } },
+              ticks: { display: false, beginAtZero: true, max: 10 } // Set max to 10 for radar chart values
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+      saveField(profileIndex, 'radarData', radarData);
+    }
+
+    function updateRadarCompetencia(profileIndex, index, field, value) {
+      if (!savedData[profileIndex]) savedData[profileIndex] = {};
+      if (!savedData[profileIndex].radarData) {
+        savedData[profileIndex].radarData = {
+          labels: ['Competência 1', 'Competência 2', 'Competência 3', 'Competência 4', 'Competência 5'],
+          values: [5, 5, 5, 5, 5]
+        };
+      }
+      if (field === 'label') {
+        savedData[profileIndex].radarData.labels[index] = value;
+      } else if (field === 'value') {
+        savedData[profileIndex].radarData.values[index] = parseInt(value) || 0;
+      }
+      updateRadarChart(profileIndex);
+    }
+
+    function clearProfile(profileIndex) {
+      // Clear all fields for the current profile
+      document.getElementById(`potencial-${profileIndex}`).value = '';
+      document.getElementById(`progresso-${profileIndex}`).value = 0;
+      document.getElementById(`progresso-text-${profileIndex}`).value = '';
+      document.getElementById(`prontidao-${profileIndex}`).value = 0;
+      document.getElementById(`prontidao-text-${profileIndex}`).value = '';
+      document.getElementById(`pdi-${profileIndex}`).value = '';
+      document.getElementById(`carreira-${profileIndex}`).value = '';
+      document.getElementById(`avaliacao-${profileIndex}`).value = '';
+      document.getElementById(`comentarios-${profileIndex}`).value = '';
+      document.getElementById(`competencias-list-${profileIndex}`).innerHTML = '';
+      document.getElementById(`competencia-${profileIndex}`).value = '';
+
+      // Reset radar chart fields
+      for (let i = 0; i < 5; i++) {
+        document.getElementById(`radar-label-${profileIndex}-${i}`).value = `Competência ${i + 1}`;
+        document.getElementById(`radar-value-${profileIndex}-${i}`).value = '5';
+      }
+
+      // Clear savedData for this profile and update localStorage
+      savedData[profileIndex] = { radarData: { labels: ['Competência 1', 'Competência 2', 'Competência 3', 'Competência 4', 'Competência 5'], values: [5, 5, 5, 5, 5] } };
+      localStorage.setItem('nextgen2025_data', JSON.stringify(savedData));
+
+      // Update UI elements
+      updateProgressBar(`progresso-${profileIndex}`);
+      updateProgressBar(`prontidao-${profileIndex}`);
+      updateRadarChart(profileIndex);
+    }
+
+    function removeProfile(index) {
+      profiles.splice(index, 1);
+      delete savedData[index];
+      localStorage.setItem('nextgen2025_data', JSON.stringify(savedData));
+      if (currentPage > 0 && currentPage >= profiles.length) {
+        currentPage--;
+      }
+      renderProfiles();
+    }
+
+    function addProfile() {
+      profiles.push({ name: `Participante ${profiles.length + 1}` });
+      renderProfiles();
+    }
+
+    function exportToPDF() {
+      alert('Exportando para PDF...');
+      // Implement PDF export logic here
+    }
+
+    function updateProgressBar(rangeId) {
+      const rangeInput = document.getElementById(rangeId);
+      const progressBar = document.getElementById(`${rangeId}-bar`);
+      const progressValueSpan = document.getElementById(`${rangeId}-value`);
+      if (rangeInput && progressBar && progressValueSpan) {
+        progressBar.style.width = `${rangeInput.value}%`;
+        progressValueSpan.textContent = `${rangeInput.value}%`;
+      }
+    }
+
+    function toggleEdit(profileIndex, field) {
+      const textarea = document.getElementById(`${field}-${profileIndex}`);
+      const editButton = document.getElementById(`edit-${field}-${profileIndex}`);
+      const saveButton = document.getElementById(`save-${field}-${profileIndex}`);
+
+      if (textarea.disabled) {
+        textarea.disabled = false;
+        editButton.classList.add('hidden');
+        saveButton.classList.remove('hidden');
+        textarea.focus();
+      } else {
+        textarea.disabled = true;
+        editButton.classList.remove('hidden');
+        saveButton.classList.add('hidden');
+        saveField(profileIndex, field, textarea.value);
+      }
+    }
+
+    function renderProfiles() {
+      const container = document.getElementById('profiles-container');
+      container.innerHTML = '';
+      const profileIndex = currentPage;
+      if (profileIndex >= profiles.length) {
+        container.innerHTML = '<p class="text-center text-gray-500">Nenhum perfil para exibir. Adicione um novo perfil.</p>';
+        document.getElementById('prev-btn').disabled = true;
+        document.getElementById('next-btn').disabled = true;
+        return;
+      }
+
+      const profile = profiles[profileIndex];
+      const profileData = savedData[profileIndex] || {};
+
+      const profileDiv = document.createElement('div');
+      profileDiv.className = 'grid grid-cols-3 gap-6 bg-white p-6 rounded-lg shadow-lg border border-gray-200';
+      profileDiv.innerHTML = `
+        <div class="col-span-2">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold orange-text">${profile.name} <span class="gray-text text-sm">✏️</span></h2>
+            <div class="space-x-2">
+              <button onclick="clearProfile(${profileIndex})" class="text-gray-500 hover:text-gray-700 text-sm">Limpar Perfil</button>
+              <button onclick="removeProfile(${profileIndex})" class="orange-text hover:underline text-sm">🗑️ Remover Perfil</button>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block font-medium gray-text text-sm">Potencial de Liderança</label>
+              <textarea id="potencial-${profileIndex}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text" placeholder="Potencial de Liderança" disabled>${profileData.potencial || ''}</textarea>
+              <div class="flex space-x-2 mt-2">
+                <button id="edit-potencial-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'potencial')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm">Editar</button>
+                <button id="save-potencial-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'potencial')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm hidden">Salvar</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium gray-text text-sm">Progresso no Programa</label>
+              <div class="progress-container mt-1">
+                <div class="progress-bar" id="progresso-bar-${profileIndex}" style="width: ${profileData.progresso?.value || 0}%"></div>
+                <input type="range" min="0" max="100" value="${profileData.progresso?.value || 0}" id="progresso-${profileIndex}" oninput="updateProgressBar('progresso-${profileIndex}')">
+              </div>
+              <span id="progresso-value-${profileIndex}" class="gray-text text-sm">${profileData.progresso?.value || 0}%</span>
+              <textarea id="progresso-text-${profileIndex}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text mt-2" placeholder="Detalhes do progresso" disabled>${profileData.progresso?.text || ''}</textarea>
+              <div class="flex space-x-2 mt-2">
+                <button id="edit-progresso-text-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'progresso-text')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm">Editar</button>
+                <button id="save-progresso-text-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'progresso-text')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm hidden">Salvar</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium gray-text text-sm">Prontidão para Sucessão</label>
+              <div class="progress-container mt-1">
+                <div class="progress-bar" id="prontidao-bar-${profileIndex}" style="width: ${profileData.prontidao?.value || 0}%"></div>
+                <input type="range" min="0" max="100" value="${profileData.prontidao?.value || 0}" id="prontidao-${profileIndex}" oninput="updateProgressBar('prontidao-${profileIndex}')">
+              </div>
+              <span id="prontidao-value-${profileIndex}" class="gray-text text-sm">${profileData.prontidao?.value || 0}%</span>
+              <textarea id="prontidao-text-${profileIndex}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text mt-2" placeholder="Detalhes da prontidão" disabled>${profileData.prontidao?.text || ''}</textarea>
+              <div class="flex space-x-2 mt-2">
+                <button id="edit-prontidao-text-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'prontidao-text')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm">Editar</button>
+                <button id="save-prontidao-text-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'prontidao-text')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm hidden">Salvar</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium gray-text text-sm">Competências-Chave</label>
+              <input type="text" id="competencia-${profileIndex}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text" placeholder="Nova Competência">
+              <button onclick="addCompetencia(${profileIndex})" class="orange-bg text-white px-3 py-1 mt-2 rounded-md hover:bg-orange-600 text-sm">Adicionar Competência</button>
+              <ul id="competencias-list-${profileIndex}" class="mt-2 space-y-1">${(profileData.competencias || []).map(comp => `<li class="gray-text text-sm flex justify-between items-center"><span>${comp}</span><button onclick="removeCompetencia(${profileIndex}, '${comp}')" class="text-red-500 hover:text-red-700 text-xs ml-2">x</button></li>`).join('')}</ul>
+            </div>
+
+            <div>
+              <label class="block font-medium gray-text text-sm">Plano de Desenvolvimento Individual (PDI)</label>
+              <textarea id="pdi-${profileIndex}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text" placeholder="Plano de Desenvolvimento" disabled>${profileData.pdi || ''}</textarea>
+              <div class="flex space-x-2 mt-2">
+                <button id="edit-pdi-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'pdi')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm">Editar</button>
+                <button id="save-pdi-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'pdi')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm hidden">Salvar</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium gray-text text-sm">Carreira e Formação</label>
+              <textarea id="carreira-${profileIndex}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text" placeholder="Carreira e Formação" disabled>${profileData.carreira || ''}</textarea>
+              <div class="flex space-x-2 mt-2">
+                <button id="edit-carreira-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'carreira')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm">Editar</button>
+                <button id="save-carreira-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'carreira')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm hidden">Salvar</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium gray-text text-sm">Avaliação do Mentor</label>
+              <textarea id="avaliacao-${profileIndex}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text" placeholder="Avaliação do Mentor" disabled>${profileData.avaliacao || ''}</textarea>
+              <div class="flex space-x-2 mt-2">
+                <button id="edit-avaliacao-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'avaliacao')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm">Editar</button>
+                <button id="save-avaliacao-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'avaliacao')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm hidden">Salvar</button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-medium gray-text text-sm">Comentários Adicionais</label>
+              <textarea id="comentarios-${profileIndex}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text" placeholder="Comentários Adicionais" disabled>${profileData.comentarios || ''}</textarea>
+              <div class="flex space-x-2 mt-2">
+                <button id="edit-comentarios-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'comentarios')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm">Editar</button>
+                <button id="save-comentarios-${profileIndex}" onclick="toggleEdit(${profileIndex}, 'comentarios')" class="orange-bg text-white px-3 py-1 rounded-md hover:bg-orange-600 text-sm hidden">Salvar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-span-1">
+          <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
+            
+<!-- Foto do Perfil -->
+<div class="flex flex-col items-center mb-6">
+  <img id="profile-photo-${profileIndex}" src="${profileData.photo || 'https://via.placeholder.com/120'}" alt="Foto do perfil" class="w-28 h-28 rounded-full object-cover border-2 border-orange-400 mb-2">
+  <input type="file" accept="image/*" class="text-sm text-gray-600" onchange="uploadPhoto(event, ${profileIndex})">
+</div>
+<h3 class="text-lg font-semibold orange-text mb-4">Gráfico de Competências</h3>
+            <canvas id="radar-chart-${profileIndex}"></canvas>
+            <div class="mt-4 space-y-2">
+              ${(profileData.radarData?.labels || ['Competência 1', 'Competência 2', 'Competência 3', 'Competência 4', 'Competência 5']).map((label, i) => `
+                <div>
+                  <label class="block font-medium gray-text text-sm">Competência ${i + 1} Nome:</label>
+                  <input type="text" id="radar-label-${profileIndex}-${i}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text" value="${label}" oninput="updateRadarCompetencia(${profileIndex}, ${i}, 'label', this.value)">
+                  <label class="block font-medium gray-text text-sm mt-2">Competência ${i + 1} Valor (0-10):</label>
+                  <input type="number" id="radar-value-${profileIndex}-${i}" class="w-full border border-gray-300 p-2 rounded-md text-sm gray-text" min="0" max="10" value="${profileData.radarData?.values[i] || 5}" oninput="updateRadarCompetencia(${profileIndex}, ${i}, 'value', this.value)">
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(profileDiv);
+
+      // Initialize radar chart and progress bars after rendering
+      updateRadarChart(profileIndex);
+      updateProgressBar(`progresso-${profileIndex}`);
+      updateProgressBar(`prontidao-${profileIndex}`);
+
+      document.getElementById('prev-btn').disabled = currentPage === 0;
+      document.getElementById('next-btn').disabled = currentPage === profiles.length - 1;
+    }
+
+    function nextPage() {
+      if (currentPage < profiles.length - 1) {
+        currentPage++;
+        renderProfiles();
+      }
+    }
+
+    function previousPage() {
+      if (currentPage > 0) {
+        currentPage--;
+        renderProfiles();
+      }
+    }
+
+    // Initial render
+    renderProfiles();
+  </script>
+</body>
+</html>
