@@ -130,23 +130,6 @@
 </div>
 </div>
 <script>
-function uploadPhoto(event, profileIndex) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    const imageDataUrl = e.target.result;
-    savedData[profileIndex] = savedData[profileIndex] || {};
-    savedData[profileIndex].photo = imageDataUrl;
-    localStorage.setItem('nextgen2025_data', JSON.stringify(savedData));
-    renderProfiles();
-  };
-  reader.readAsDataURL(file);
-}
-
-
-
     const profiles = [
       { name: 'Ana Silva' },
       { name: 'Carlos Mendes' },
@@ -451,10 +434,10 @@ function uploadPhoto(event, profileIndex) {
         <div class="col-span-1">
           <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
             
-<!-- Foto do Perfil -->
+<!-- Foto do Perfil com URL -->
 <div class="flex flex-col items-center mb-6">
   <img id="profile-photo-${profileIndex}" src="${profileData.photo || 'https://via.placeholder.com/120'}" alt="Foto do perfil" class="w-28 h-28 rounded-full object-cover border-2 border-orange-400 mb-2">
-  <input type="file" accept="image/*" class="text-sm text-gray-600" onchange="uploadPhoto(event, ${profileIndex})">
+  <input type="text" placeholder="Cole o link da imagem" class="text-sm text-gray-600 border p-1 rounded w-full" onblur="saveField(${profileIndex}, 'photo', this.value)">
 </div>
 <h3 class="text-lg font-semibold orange-text mb-4">Gráfico de Competências</h3>
             <canvas id="radar-chart-${profileIndex}"></canvas>
